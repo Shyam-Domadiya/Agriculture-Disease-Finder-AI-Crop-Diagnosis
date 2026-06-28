@@ -60,36 +60,101 @@ CROP_DEFS = {
                 "color": "#4CAF50",
                 "description": "Your tomato plant looks healthy and thriving!",
                 "tip": "Maintain regular watering and monitor for any pest activity.",
+                "organic": ["Maintain healthy soil biology with quality compost tea"],
+                "chemical": [],
+                "prevention": ["Rotate solanaceous crops every 3 years", "Keep watering schedules regular and base-focused"],
             },
             "Early_Blight": {
                 "emoji": "🟡",
                 "color": "#FFC107",
                 "description": "Fungal disease causing brown/black target-like concentric rings on older leaves.",
                 "tip": "Prune lower leaves, avoid overhead irrigation, and apply copper fungicide.",
+                "organic": [
+                    "Prune lower leaves up to 12 inches high to prevent soil splash",
+                    "Apply thick organic mulch (straw or bark) around the base",
+                    "Spray organic neem oil or copper octanoate solution"
+                ],
+                "chemical": [
+                    "Apply chlorothalonil or mancozeb fungicide at first sign of spots",
+                    "Rotate chemical classes over seasons to prevent fungal resistance"
+                ],
+                "prevention": [
+                    "Water strictly at the base of the plant, not overhead",
+                    "Space tomato plants at least 24 inches apart to promote airflow"
+                ],
             },
             "Late_Blight": {
                 "emoji": "🔴",
                 "color": "#F44336",
                 "description": "Devastating pathogen causing dark water-soaked spots and fuzzy white mold under leaves.",
                 "tip": "Destroy infected plants immediately, improve air flow, and apply systemic fungicide.",
+                "organic": [
+                    "Remove and deeply bury or burn infected plants immediately",
+                    "Do not compost infected foliage (spores can survive)",
+                    "Spray preventative bio-fungicides containing Bacillus subtilis"
+                ],
+                "chemical": [
+                    "Apply chlorothalonil, copper fungicide, or systemic metalaxyl at first local warning"
+                ],
+                "prevention": [
+                    "Plant only certified disease-free seeds or starts",
+                    "Avoid overhead watering during high-humidity periods"
+                ],
             },
             "Bacterial_Wilt": {
                 "emoji": "🟣",
                 "color": "#9C27B0",
                 "description": "Soil-borne bacteria blocking water transport, causing rapid green wilting of stems.",
                 "tip": "Remove infected plants, rotate crops, sterilize pruning tools, and improve drainage.",
+                "organic": [
+                    "Pull and discard infected plants immediately to prevent soil spread",
+                    "Amend soil with rich organic compost to improve drainage",
+                    "Apply beneficial Trichoderma fungi to root zones at planting"
+                ],
+                "chemical": [
+                    "No effective chemical cures exist; focus on soil sanitization and pH management"
+                ],
+                "prevention": [
+                    "Maintain soil pH between 6.2 and 6.8",
+                    "Avoid physical root damage when weeding or cultivating",
+                    "Rotate tomatoes with non-susceptible crops like corn or beans"
+                ],
             },
             "Mosaic_Virus": {
                 "emoji": "🌐",
                 "color": "#009688",
                 "description": "Highly infectious virus causing green/yellow mosaic leaf patterns and leaf distortion.",
                 "tip": "Control aphid vectors, remove infected weeds, and plant virus-resistant varieties.",
+                "organic": [
+                    "Eradicate infected plants immediately to stop systemic transmission",
+                    "Use insecticidal soaps or neem oil to control aphid and whitefly vectors"
+                ],
+                "chemical": [
+                    "No chemical viricides exist; manage vectors using systemic insecticides if necessary"
+                ],
+                "prevention": [
+                    "Wash hands and tools with soap or milk before handling healthy plants",
+                    "Sow certified virus-free seed varieties",
+                    "Control weed hosts around the garden perimeter"
+                ],
             },
             "Septoria_Leaf_Spot": {
                 "emoji": "🟠",
                 "color": "#FF5722",
                 "description": "Fungal spots with dark margins and grey centers, causing leaves to yellow and drop.",
                 "tip": "Keep foliage dry, apply organic mulch, and use preventive bio-fungicides.",
+                "organic": [
+                    "Prune infected leaves from lower stem and discard",
+                    "Apply straw mulch to block soil-borne spores from splashing upwards",
+                    "Apply copper octanoate or organic sulfur sprays"
+                ],
+                "chemical": [
+                    "Apply chlorothalonil or mancozeb at 7-10 day intervals during wet, warm periods"
+                ],
+                "prevention": [
+                    "Practice 3-year crop rotation schedules",
+                    "Clean up all garden debris thoroughly in autumn"
+                ],
             },
         },
         "disease_cpd": [
@@ -142,36 +207,90 @@ CROP_DEFS = {
                 "color": "#4CAF50",
                 "description": "Your wheat field shows no signs of infection.",
                 "tip": "Continue monitoring environmental moisture levels.",
+                "organic": ["Monitor tillers weekly for early rust warning signs"],
+                "chemical": [],
+                "prevention": ["Avoid excess nitrogen fertilization", "Optimize seeding rates for proper ventilation"],
             },
             "Leaf_Rust": {
                 "emoji": "🟠",
                 "color": "#FF5722",
                 "description": "Fungal spores producing orange-brown pustules on leaves, restricting photosynthesis.",
                 "tip": "Apply triazole fungicides and select rust-resistant wheat seed varieties.",
+                "organic": [
+                    "Sow rust-resistant wheat seed cultivars",
+                    "Integrate mixed crop borders to buffer spore spreads"
+                ],
+                "chemical": [
+                    "Apply triazole or strobilurin foliar fungicide when pustules reach upper leaves"
+                ],
+                "prevention": [
+                    "Destroy volunteer wheat plants in summer to break host cycles",
+                    "Avoid excessively early planting dates in the autumn"
+                ],
             },
             "Stem_Rust": {
                 "emoji": "🔴",
                 "color": "#F44336",
                 "description": "A highly damaging rust causing dark reddish-brown pustules on stems, leading to lodging.",
                 "tip": "Inspect fields early, apply systemic fungicide, and eliminate barberry weeds nearby.",
+                "organic": [
+                    "Eradicate common barberry bushes (alternate hosts) within 1 mile of the field"
+                ],
+                "chemical": [
+                    "Apply systemic tebuconazole or propiconazole at first spot detection"
+                ],
+                "prevention": [
+                    "Choose cultivars containing Sr genes for stem rust resistance"
+                ],
             },
             "Powdery_Mildew": {
                 "emoji": "🟡",
                 "color": "#FFC107",
                 "description": "Fungal growth forming white, fluffy, powdery spots on lower leaves.",
                 "tip": "Avoid dense sowing, reduce nitrogen fertilizer overuse, and apply fungicide.",
+                "organic": [
+                    "Optimize sowing density to prevent high humidity in the canopy",
+                    "Apply sulfur dust preventatively to susceptible varieties"
+                ],
+                "chemical": [
+                    "Apply quinoxyfen or triazole fungicides at flag leaf emergence stage"
+                ],
+                "prevention": [
+                    "Avoid excessive nitrogen fertilizer which causes lush, soft tissue",
+                    "Rotate wheat with broadleaf crops like canola or peas"
+                ],
             },
             "Loose_Smut": {
                 "emoji": "⬛",
                 "color": "#424242",
                 "description": "Fungal disease replacing healthy grain heads with powdery olive-black soot spores.",
                 "tip": "Use certified disease-free seed, or apply systemic chemical seed treatments.",
+                "organic": [
+                    "Perform hot water seed treatment (immerse seeds at 49°C for exactly 10 minutes)"
+                ],
+                "chemical": [
+                    "Apply systemic carboxin or tebuconazole seed treatments prior to sowing"
+                ],
+                "prevention": [
+                    "Sow only certified smut-free seed lots"
+                ],
             },
             "Root_Rot": {
                 "emoji": "🟣",
                 "color": "#9C27B0",
                 "description": "Decaying roots and crown due to damp conditions, causing stunted growth and yellow tillers.",
                 "tip": "Improve field drainage, practice crop rotation, and avoid planting in cold wet soils.",
+                "organic": [
+                    "Inoculate seeds with Trichoderma harzianum or Bacillus subtilis bio-agents"
+                ],
+                "chemical": [
+                    "Treat seeds with fludioxonil or difenoconazole fungicides prior to sowing"
+                ],
+                "prevention": [
+                    "Improve field drainage and tile systems",
+                    "Maintain a balanced 3-year crop rotation",
+                    "Avoid sowing when soil is excessively wet and cold"
+                ],
             },
         },
         "disease_cpd": [
@@ -222,36 +341,96 @@ CROP_DEFS = {
                 "color": "#4CAF50",
                 "description": "Your potato foliage and roots appear healthy.",
                 "tip": "Maintain balanced moisture levels and watch out for beetles.",
+                "organic": ["Encourage beneficial ladybirds to control aphid populations"],
+                "chemical": [],
+                "prevention": ["Keep potato hills fully covered with soil to protect developing tubers"],
             },
             "Late_Blight": {
                 "emoji": "🔴",
                 "color": "#F44336",
                 "description": "The notorious blight causing rotting spots, quick leaf decay, and white fuzzy spores in humid weather.",
                 "tip": "Remove infected foliage, use certified seed tubers, and spray copper-based fungicide.",
+                "organic": [
+                    "Destroy infected cull piles away from fields",
+                    "Harvest only during dry weather conditions",
+                    "Apply copper-based protectant sprays weekly"
+                ],
+                "chemical": [
+                    "Apply mancozeb, chlorothalonil, or fluazinam preventatively during high-humidity forecasts"
+                ],
+                "prevention": [
+                    "Destroy all volunteer potato plants in spring",
+                    "Plant certified disease-free seed tubers"
+                ],
             },
             "Early_Blight": {
                 "emoji": "🟠",
                 "color": "#FF5722",
                 "description": "Fungus causing dry, dark brown lesions with target-pattern rings on mature leaves.",
                 "tip": "Apply mulch, avoid overhead watering, and fertilize adequately.",
+                "organic": [
+                    "Ensure balanced soil fertility (avoid nitrogen stress)",
+                    "Apply organic compost teas to boost foliar health"
+                ],
+                "chemical": [
+                    "Apply protectant fungicides (mancozeb, chlorothalonil) starting mid-season"
+                ],
+                "prevention": [
+                    "Minimize leaf wetness duration by watering early in the morning",
+                    "Incorporate or bury crop debris deep into soil post-harvest"
+                ],
             },
             "Black_Dot": {
                 "emoji": "🟡",
                 "color": "#FFC107",
                 "description": "Fungal infection yielding yellow wilted foliage and tiny black spots on stems and roots.",
                 "tip": "Ensure proper field drainage, destroy old stems, and rotate crops.",
+                "organic": [
+                    "Harvest crop immediately once tubers mature to prevent skin silvering",
+                    "Amend soil structure with leaf compost to improve aeration"
+                ],
+                "chemical": [
+                    "Use seed-applied fungicides as no effective post-emergence options exist"
+                ],
+                "prevention": [
+                    "Practice rigorous 3-to-4 year rotations with non-hosts",
+                    "Ensure balanced nitrogen and phosphorus levels"
+                ],
             },
             "Common_Scab": {
                 "emoji": "🟤",
                 "color": "#8D6E63",
                 "description": "Bacterial pathogen causing corky, scabby lesions on tuber surfaces (represented by brown foliage spots).",
                 "tip": "Lower soil pH slightly, keep soil damp during tuber initiation, and rotate crops.",
+                "organic": [
+                    "Incorporate green rye or clover manure into soil",
+                    "Maintain soil moisture at field capacity during tuber initiation"
+                ],
+                "chemical": [
+                    "Treat seed tubers with protective mancozeb dust prior to planting"
+                ],
+                "prevention": [
+                    "Maintain soil pH below 5.2 (scab bacteria prefer neutral soils)",
+                    "Avoid applying fresh animal manure to potato beds",
+                    "Choose scab-resistant potato varieties"
+                ],
             },
             "Black_Scurf": {
                 "emoji": "🟣",
                 "color": "#9C27B0",
                 "description": "Rhizoctonia infection causing dark brown scale on tubers, stunting, and upward leaf curling.",
                 "tip": "Plant seed in warm soils, avoid deep planting, and harvest early.",
+                "organic": [
+                    "Harvest tubers as soon as skin sets",
+                    "Expose seed tubers to light (chitting) to speed up shoot emergence"
+                ],
+                "chemical": [
+                    "Apply fludioxonil or azoxystrobin seed treatments at planting"
+                ],
+                "prevention": [
+                    "Avoid deep planting in cold, wet spring soils",
+                    "Rotate potato crops with barley or oats"
+                ],
             },
         },
         "disease_cpd": [
@@ -304,36 +483,90 @@ CROP_DEFS = {
                 "color": "#4CAF50",
                 "description": "Your maize plants appear strong, tall, and healthy.",
                 "tip": "Maintain regular watering and nitrogen schedules.",
+                "organic": ["Inoculate soil with beneficial mycorrhizal fungi at seeding"],
+                "chemical": [],
+                "prevention": ["Monitor soil potassium levels to keep stalk rind thickness healthy"],
             },
             "Common_Rust": {
                 "emoji": "🟠",
                 "color": "#FF5722",
                 "description": "Fungal rust creating small, powdery, cinnamon-brown pustules on leaves.",
                 "tip": "Plant resistant hybrids, spray foliar fungicides if severe, and destroy crop residues.",
+                "organic": [
+                    "Bury corn stalks deep into the soil after harvest to decompose spores"
+                ],
+                "chemical": [
+                    "Apply strobilurin or triazole foliar fungicides if rust appears prior to tasseling"
+                ],
+                "prevention": [
+                    "Plant corn hybrids with high rust resistance scores"
+                ],
             },
             "Gray_Leaf_Spot": {
                 "emoji": "🟡",
                 "color": "#FFC107",
                 "description": "Fungus producing long, rectangular, greyish-tan leaf lesions between veins.",
                 "tip": "Use tillage to bury old residues, rotate to non-host crops, and apply fungicide.",
+                "organic": [
+                    "Use crop rotation intervals to allow soil biology to decay leaf debris"
+                ],
+                "chemical": [
+                    "Apply foliar strobilurin or triazole fungicides at first sign of rectangular spots"
+                ],
+                "prevention": [
+                    "Rotate corn with soybeans, alfalfa, or wheat",
+                    "Shred old crop residues in autumn to accelerate composting"
+                ],
             },
             "Northern_Leaf_Blight": {
                 "emoji": "🟤",
                 "color": "#A1887F",
                 "description": "Fungal pathogen yielding large, grey-green cigar-shaped necrotic lesions.",
                 "tip": "Select resistant hybrids, manage crop residue, and rotate crops.",
+                "organic": [
+                    "Plant corn hybrids containing specific Ht resistance genes"
+                ],
+                "chemical": [
+                    "Apply propiconazole or prothioconazole when leaves show cigar lesions during wet forecasts"
+                ],
+                "prevention": [
+                    "Rotate out of corn for at least one full season",
+                    "Practice conservation tillage to bury crop trash"
+                ],
             },
             "Maize_Dwarf_Mosaic": {
                 "emoji": "🌐",
                 "color": "#009688",
                 "description": "Viral pathogen causing light-green mottled streaks, leaf curling, and severe stunting.",
                 "tip": "Control aphid vectors, eradicate wild Johnsongrass hosts, and sow resistant varieties.",
+                "organic": [
+                    "Eradicate Johnsongrass weeds (the main overwintering virus reservoir)",
+                    "Use reflective mulches in small plots to deter flying aphids"
+                ],
+                "chemical": [
+                    "Apply systemic insecticidal sprays to suppress aphid vector swarms"
+                ],
+                "prevention": [
+                    "Select virus-resistant corn hybrids",
+                    "Sow early in spring before aphid vectors peak in flight"
+                ],
             },
             "Stalk_Rot": {
                 "emoji": "🔴",
                 "color": "#F44336",
                 "description": "Severe decay of internal stalk tissue causing wilting, foul smell, and lodging.",
                 "tip": "Avoid plant overcrowding, avoid overwatering, and optimize potassium nutrients.",
+                "organic": [
+                    "Balance soil potassium levels to strengthen stalk structures",
+                    "Avoid mechanical stalk injuries during cultivation"
+                ],
+                "chemical": [
+                    "No chemical cures exist for stalk decay; apply foliar fungicides early to keep leaves clean"
+                ],
+                "prevention": [
+                    "Select corn hybrids with excellent stay-green and stalk-strength ratings",
+                    "Ensure proper seed population densities to prevent plant crowding"
+                ],
             },
         },
         "disease_cpd": [
