@@ -1,16 +1,16 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 
 const API_URL = 'http://localhost:8000';
 
 // Symptom configuration
 const SYMPTOMS = [
   { key: 'Wilting',       emoji: '🥀', label: 'Wilting',        help: 'The plant appears droopy or limp' },
-  { key: 'WhiteSpots',    emoji: '⚪', label: 'White Spots',    help: 'White powdery patches on leaves' },
-  { key: 'YellowLeaves',  emoji: '🍂', label: 'Yellow Leaves',  help: 'Leaves turning yellow or brown' },
-  { key: 'StuntedGrowth', emoji: '📏', label: 'Stunted Growth', help: 'Plant is smaller than expected' },
-  { key: 'BlackSpots',    emoji: '⬛', label: 'Black Spots',    help: 'Black or brown lesions on leaves' },
-  { key: 'LeafCurl',      emoji: '🌀', label: 'Leaf Curl',      help: 'Leaves curling or deforming' },
-  { key: 'FoulSmell',     emoji: '👃', label: 'Foul Smell',     help: 'Unpleasant odour from roots or stems' },
+  { key: 'WhiteSpots',    emoji: '⚪', label: 'White Spots',    help: 'White/grey spots or fuzzy mold patches' },
+  { key: 'YellowLeaves',  emoji: '🍂', label: 'Yellow Leaves',  help: 'Leaves turning yellow, brown, or mottled' },
+  { key: 'StuntedGrowth', emoji: '📏', label: 'Stunted Growth', help: 'Plant is smaller or grows slower than expected' },
+  { key: 'BlackSpots',    emoji: '⬛', label: 'Black Spots',    help: 'Dark brown or black lesions on foliage' },
+  { key: 'LeafCurl',      emoji: '🌀', label: 'Leaf Curl',      help: 'Leaves curling upwards, downwards, or twisted' },
+  { key: 'FoulSmell',     emoji: '👃', label: 'Foul Smell',     help: 'Unpleasant odour from rotting tissue or roots' },
 ];
 
 const SEVERITY_OPTIONS = ['None', 'Mild', 'Severe'];
@@ -82,6 +82,8 @@ function ResultCard({ prediction, isTop }) {
 
 function App() {
   // State
+  const [modelInfo, setModelInfo] = useState(null);
+  const [selectedCrop, setSelectedCrop] = useState('tomato');
   const [temperature, setTemperature] = useState('Normal');
   const [humidity, setHumidity]       = useState('Normal');
   const [symptoms, setSymptoms]       = useState(
@@ -91,37 +93,64 @@ function App() {
   const [loading, setLoading]     = useState(false);
   const [error, setError]         = useState(null);
 
+  // Fetch model specifications on mount
+  useEffect(() => {
+    const fetchModelInfo = async () => {
+      try {
+        const response = await fetch(`${API_URL}/model-info`);
+        if (!response.ok) throw new Error('API server is not responding');
+        const data = await response.json();
+        setModelInfo(data);
+      } catch (err) {
+        setError('Could not connect to the backend. Make sure the FastAPI API is running on port 8000.');
+        console.error(err);
+      }
+    };
+    fetchModelInfo();
+  }, []);
+
+  // Debounced auto-prediction whenever inputs change
+  useEffect(() => {
+    if (!modelInfo) return;
+
+    setLoading(true);
+    const delayDebounceFn = setTimeout(async () => {
+      try {
+        const response = await fetch(`${API_URL}/predict`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            crop: selectedCrop,
+            symptoms,
+            environment: { Temperature: temperature, Humidity: humidity },
+          }),
+        });
+
+        if (!response.ok) throw new Error('Prediction API failed');
+        const data = await response.json();
+        setResults(data);
+        setError(null);
+      } catch (err) {
+        setError('Connection lost. Please make sure the backend is active.');
+        console.error(err);
+      } finally {
+        setLoading(false);
+      }
+    }, 200); // 200ms debounce window for fast response
+
+    return () => clearTimeout(delayDebounceFn);
+  }, [selectedCrop, symptoms, temperature, humidity, modelInfo]);
+
   const updateSymptom = (key, value) => {
     setSymptoms(prev => ({ ...prev, [key]: value }));
   };
 
-  const handleDiagnose = async () => {
-    setLoading(true);
-    setError(null);
-    setResults(null);
-
-    try {
-      const response = await fetch(`${API_URL}/predict`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          symptoms,
-          environment: { Temperature: temperature, Humidity: humidity },
-        }),
-      });
-
-      if (!response.ok) throw new Error('API request failed');
-      const data = await response.json();
-      setResults(data);
-    } catch (err) {
-      setError('Could not connect to the backend. Make sure the API is running on port 8000.');
-      console.error(err);
-    } finally {
-      setLoading(false);
-    }
+  // Reset symptoms helper
+  const handleResetSymptoms = () => {
+    setSymptoms(Object.fromEntries(SYMPTOMS.map(s => [s.key, 'None'])));
   };
 
-  // Compute summary
+  // Compute active symptoms summary
   const activeSymptoms = SYMPTOMS.filter(s => symptoms[s.key] !== 'None');
 
   return (
@@ -131,15 +160,46 @@ function App() {
         <span className="header__icon">🌿</span>
         <h1 className="header__title">Agriculture Disease Finder</h1>
         <p className="header__subtitle">
-          AI-Powered Crop Disease Diagnosis using Bayesian Networks
+          Real-Time Crop Disease Diagnosis using Bayesian Networks
         </p>
         <div className="header__badges">
-          <span className="badge">🦠 7 Diseases</span>
+          <span className="badge">🌱 {modelInfo ? `${modelInfo.crops.length} Crops` : 'Crops'}</span>
+          <span className="badge">🦠 {modelInfo ? `${modelInfo.crop_details[selectedCrop]?.diseases.length} Diseases` : 'Diseases'}</span>
           <span className="badge">🩺 7 Symptoms</span>
           <span className="badge">🌡️ Environment AI</span>
-          <span className="badge">📊 Severity Levels</span>
         </div>
       </header>
+
+      <hr className="divider" />
+
+      {/* ---- Crop Selection ---- */}
+      <section className="section">
+        <h2 className="section__title">🌾 Select Your Crop</h2>
+        <p className="section__subtitle">
+          Choose a crop type to load its specialized disease diagnosis model
+        </p>
+        {modelInfo ? (
+          <div className="crop-grid">
+            {modelInfo.crops.map((cropKey) => {
+              const crop = modelInfo.crop_details[cropKey];
+              const isSelected = selectedCrop === cropKey;
+              return (
+                <button
+                  key={cropKey}
+                  type="button"
+                  className={`crop-card ${isSelected ? 'crop-card--active' : ''}`}
+                  onClick={() => setSelectedCrop(cropKey)}
+                >
+                  <span className="crop-card__emoji">{crop.emoji}</span>
+                  <span className="crop-card__name">{crop.name}</span>
+                </button>
+              );
+            })}
+          </div>
+        ) : (
+          <div className="loading-placeholder">Loading crop models...</div>
+        )}
+      </section>
 
       <hr className="divider" />
 
@@ -147,7 +207,7 @@ function App() {
       <section className="section">
         <h2 className="section__title">🌡️ Environmental Conditions</h2>
         <p className="section__subtitle">
-          Set the current weather conditions to refine the diagnosis
+          Set current weather factors (Temperature & Humidity) to calibrate disease priors
         </p>
         <div className="card card--env">
           <div className="env-grid">
@@ -183,9 +243,16 @@ function App() {
 
       {/* ---- Symptoms ---- */}
       <section className="section">
-        <h2 className="section__title">🩺 Observed Symptoms</h2>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
+          <h2 className="section__title" style={{ margin: 0 }}>🩺 Observed Symptoms</h2>
+          {activeSymptoms.length > 0 && (
+            <button type="button" className="reset-link" onClick={handleResetSymptoms}>
+              🔄 Reset Symptoms
+            </button>
+          )}
+        </div>
         <p className="section__subtitle">
-          Rate each symptom's severity — leave as None if not observed
+          Rate each symptom's severity — values propagate to the Bayesian Network in real-time
         </p>
         <div className="symptom-grid">
           {SYMPTOMS.map((symptom) => (
@@ -205,34 +272,24 @@ function App() {
 
       <hr className="divider" />
 
-      {/* ---- Diagnose Button ---- */}
-      <button
-        className="diagnose-btn"
-        onClick={handleDiagnose}
-        disabled={loading}
-      >
-        {loading ? '⏳ Analysing...' : '🔍  Diagnose My Crop'}
-      </button>
-
-      <hr className="divider" />
-
-      {/* ---- Results / Placeholder ---- */}
-      {loading && (
-        <div className="loading">
-          <div className="spinner" />
-          <span>Analysing symptoms with Bayesian inference...</span>
-        </div>
-      )}
+      {/* ---- Live Diagnosis Status ---- */}
+      <div className="live-status-bar">
+        <span className="live-status-bar__pulse"></span>
+        <span className="live-status-bar__text">
+          {loading ? '⏳ Updating Bayesian inference...' : '⚡ Live AI Diagnostics Active'}
+        </span>
+      </div>
 
       {error && (
-        <div className="summary-banner" style={{ borderColor: 'rgba(244,67,54,0.3)', background: 'rgba(244,67,54,0.08)' }}>
+        <div className="summary-banner" style={{ borderColor: 'rgba(244,67,54,0.3)', background: 'rgba(244,67,54,0.08)', marginTop: '1.5rem' }}>
           <strong>⚠️ Error:</strong> {error}
         </div>
       )}
 
-      {results && !loading && (
-        <div className="results">
-          <h2 className="section__title">📊 Diagnosis Results</h2>
+      {/* ---- Results ---- */}
+      {results && (
+        <div className="results" style={{ opacity: loading ? 0.75 : 1, transition: 'opacity 0.2s' }}>
+          <h2 className="section__title">📊 Probabilistic Diagnosis</h2>
 
           {/* Bar Chart */}
           <BarChart predictions={results.predictions} />
@@ -250,10 +307,13 @@ function App() {
 
           {/* Summary */}
           <div className="summary-banner">
+            <strong>Crop: </strong>
+            {modelInfo ? modelInfo.crop_details[selectedCrop]?.name : selectedCrop}
+            <br />
             <strong>Symptoms observed: </strong>
             {activeSymptoms.length > 0
               ? activeSymptoms.map(s => `${s.emoji} ${s.label} (${symptoms[s.key]})`).join(', ')
-              : 'None'
+              : 'None (Healthy Baseline)'
             }
             <br />
             <strong>Environment: </strong>
@@ -265,22 +325,10 @@ function App() {
         </div>
       )}
 
-      {!results && !loading && !error && (
-        <div className="placeholder">
-          <span className="placeholder__icon">🌱</span>
-          <p className="placeholder__text">
-            Set environmental conditions, rate symptom severity, and click <strong>Diagnose My Crop</strong>
-          </p>
-          <p className="placeholder__subtext">
-            The expanded AI model analyses 7 symptoms × 7 diseases with environmental context
-          </p>
-        </div>
-      )}
-
       {/* ---- Footer ---- */}
       <footer className="footer">
-        Agriculture Disease Finder • 7 Diseases · 7 Symptoms · Environmental AI
-        • Powered by Bayesian Networks (pgmpy) • React + FastAPI
+        Agriculture Disease Finder • Multi-Crop Bayesian AI
+        • Powered by pgmpy • React + FastAPI
       </footer>
     </div>
   );

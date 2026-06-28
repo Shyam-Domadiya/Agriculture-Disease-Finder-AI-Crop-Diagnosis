@@ -1,19 +1,20 @@
 """
 Agriculture Disease Finder — FastAPI Backend
 =============================================
-REST API serving crop disease predictions from an expanded
-Bayesian Network model using pgmpy.
+REST API serving crop disease predictions from crop-specific
+Bayesian Networks using pgmpy.
 
+Crops Supported: Tomato, Wheat, Potato, Corn.
 Endpoints:
-    POST /predict   — Predict disease from symptoms + environment
+    POST /predict   — Predict disease from crop type + symptoms + environment
     GET  /health    — Health check
-    GET  /model-info — Model metadata
+    GET  /model-info — Model metadata for all crops
 
 Run with:  python backend.py
     or:    uvicorn backend:app --reload --port 8000
 """
 
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
@@ -23,21 +24,10 @@ from pgmpy.inference import VariableElimination
 
 
 # ------------------------------------------------------------------
-# Constants
+# Global Constants
 # ------------------------------------------------------------------
-DISEASE_STATES = [
-    "Healthy",
-    "Powdery_Mildew",
-    "Root_Rot",
-    "Leaf_Blight",
-    "Bacterial_Wilt",
-    "Downy_Mildew",
-    "Mosaic_Virus",
-]
-
-SYMPTOM_STATES = ["None", "Mild", "Severe"]
 ENVIRON_STATES = ["Low", "Normal", "High"]
-
+SYMPTOM_STATES = ["None", "Mild", "Severe"]
 SYMPTOM_NODES = [
     "Wilting",
     "WhiteSpots",
@@ -47,64 +37,368 @@ SYMPTOM_NODES = [
     "LeafCurl",
     "FoulSmell",
 ]
-
 ENVIRON_NODES = ["Temperature", "Humidity"]
 
-# Disease metadata for the frontend
-DISEASE_INFO = {
-    "Healthy": {
-        "emoji": "🟢",
-        "color": "#4CAF50",
-        "description": "Your crop appears healthy! No disease detected.",
-        "tip": "Continue regular care and monitoring.",
+# ------------------------------------------------------------------
+# Crop-Specific Diseases & Information
+# ------------------------------------------------------------------
+CROP_DEFS = {
+    "tomato": {
+        "name": "Tomato",
+        "emoji": "🍅",
+        "diseases": [
+            "Healthy",
+            "Early_Blight",
+            "Late_Blight",
+            "Bacterial_Wilt",
+            "Mosaic_Virus",
+            "Septoria_Leaf_Spot",
+        ],
+        "disease_info": {
+            "Healthy": {
+                "emoji": "🟢",
+                "color": "#4CAF50",
+                "description": "Your tomato plant looks healthy and thriving!",
+                "tip": "Maintain regular watering and monitor for any pest activity.",
+            },
+            "Early_Blight": {
+                "emoji": "🟡",
+                "color": "#FFC107",
+                "description": "Fungal disease causing brown/black target-like concentric rings on older leaves.",
+                "tip": "Prune lower leaves, avoid overhead irrigation, and apply copper fungicide.",
+            },
+            "Late_Blight": {
+                "emoji": "🔴",
+                "color": "#F44336",
+                "description": "Devastating pathogen causing dark water-soaked spots and fuzzy white mold under leaves.",
+                "tip": "Destroy infected plants immediately, improve air flow, and apply systemic fungicide.",
+            },
+            "Bacterial_Wilt": {
+                "emoji": "🟣",
+                "color": "#9C27B0",
+                "description": "Soil-borne bacteria blocking water transport, causing rapid green wilting of stems.",
+                "tip": "Remove infected plants, rotate crops, sterilize pruning tools, and improve drainage.",
+            },
+            "Mosaic_Virus": {
+                "emoji": "🌐",
+                "color": "#009688",
+                "description": "Highly infectious virus causing green/yellow mosaic leaf patterns and leaf distortion.",
+                "tip": "Control aphid vectors, remove infected weeds, and plant virus-resistant varieties.",
+            },
+            "Septoria_Leaf_Spot": {
+                "emoji": "🟠",
+                "color": "#FF5722",
+                "description": "Fungal spots with dark margins and grey centers, causing leaves to yellow and drop.",
+                "tip": "Keep foliage dry, apply organic mulch, and use preventive bio-fungicides.",
+            },
+        },
+        "disease_cpd": [
+            [0.60, 0.50, 0.20, 0.70, 0.75, 0.30, 0.50, 0.40, 0.15],
+            [0.05, 0.05, 0.10, 0.05, 0.05, 0.15, 0.10, 0.15, 0.25],
+            [0.10, 0.20, 0.45, 0.05, 0.05, 0.20, 0.02, 0.02, 0.05],
+            [0.02, 0.02, 0.02, 0.05, 0.05, 0.10, 0.10, 0.15, 0.30],
+            [0.18, 0.18, 0.18, 0.10, 0.05, 0.10, 0.20, 0.20, 0.10],
+            [0.05, 0.05, 0.05, 0.05, 0.05, 0.15, 0.08, 0.08, 0.15],
+        ],
+        "symptoms": {
+            "Healthy": {
+                "Wilting": [0.95, 0.04, 0.01], "WhiteSpots": [0.98, 0.01, 0.01], "YellowLeaves": [0.95, 0.04, 0.01],
+                "StuntedGrowth": [0.97, 0.02, 0.01], "BlackSpots": [0.98, 0.01, 0.01], "LeafCurl": [0.96, 0.03, 0.01],
+                "FoulSmell": [0.99, 0.01, 0.00]
+            },
+            "Early_Blight": {
+                "BlackSpots": [0.05, 0.25, 0.70], "YellowLeaves": [0.15, 0.45, 0.40], "StuntedGrowth": [0.70, 0.20, 0.10],
+                "Wilting": [0.70, 0.20, 0.10]
+            },
+            "Late_Blight": {
+                "BlackSpots": [0.10, 0.30, 0.60], "Wilting": [0.40, 0.40, 0.20], "WhiteSpots": [0.10, 0.40, 0.50],
+                "FoulSmell": [0.40, 0.40, 0.20], "YellowLeaves": [0.20, 0.50, 0.30]
+            },
+            "Bacterial_Wilt": {
+                "Wilting": [0.05, 0.15, 0.80], "FoulSmell": [0.20, 0.30, 0.50], "StuntedGrowth": [0.30, 0.40, 0.30]
+            },
+            "Mosaic_Virus": {
+                "LeafCurl": [0.05, 0.25, 0.70], "StuntedGrowth": [0.05, 0.25, 0.70], "YellowLeaves": [0.10, 0.30, 0.60]
+            },
+            "Septoria_Leaf_Spot": {
+                "WhiteSpots": [0.15, 0.45, 0.40], "YellowLeaves": [0.15, 0.50, 0.35], "BlackSpots": [0.20, 0.50, 0.30]
+            }
+        }
     },
-    "Powdery_Mildew": {
-        "emoji": "🟡",
-        "color": "#FFC107",
-        "description": "A fungal disease causing white powdery spots on leaf surfaces.",
-        "tip": "Apply fungicide, improve air circulation, avoid overhead watering.",
+    "wheat": {
+        "name": "Wheat",
+        "emoji": "🌾",
+        "diseases": [
+            "Healthy",
+            "Leaf_Rust",
+            "Stem_Rust",
+            "Powdery_Mildew",
+            "Loose_Smut",
+            "Root_Rot",
+        ],
+        "disease_info": {
+            "Healthy": {
+                "emoji": "🟢",
+                "color": "#4CAF50",
+                "description": "Your wheat field shows no signs of infection.",
+                "tip": "Continue monitoring environmental moisture levels.",
+            },
+            "Leaf_Rust": {
+                "emoji": "🟠",
+                "color": "#FF5722",
+                "description": "Fungal spores producing orange-brown pustules on leaves, restricting photosynthesis.",
+                "tip": "Apply triazole fungicides and select rust-resistant wheat seed varieties.",
+            },
+            "Stem_Rust": {
+                "emoji": "🔴",
+                "color": "#F44336",
+                "description": "A highly damaging rust causing dark reddish-brown pustules on stems, leading to lodging.",
+                "tip": "Inspect fields early, apply systemic fungicide, and eliminate barberry weeds nearby.",
+            },
+            "Powdery_Mildew": {
+                "emoji": "🟡",
+                "color": "#FFC107",
+                "description": "Fungal growth forming white, fluffy, powdery spots on lower leaves.",
+                "tip": "Avoid dense sowing, reduce nitrogen fertilizer overuse, and apply fungicide.",
+            },
+            "Loose_Smut": {
+                "emoji": "⬛",
+                "color": "#424242",
+                "description": "Fungal disease replacing healthy grain heads with powdery olive-black soot spores.",
+                "tip": "Use certified disease-free seed, or apply systemic chemical seed treatments.",
+            },
+            "Root_Rot": {
+                "emoji": "🟣",
+                "color": "#9C27B0",
+                "description": "Decaying roots and crown due to damp conditions, causing stunted growth and yellow tillers.",
+                "tip": "Improve field drainage, practice crop rotation, and avoid planting in cold wet soils.",
+            },
+        },
+        "disease_cpd": [
+            [0.65, 0.55, 0.25, 0.70, 0.75, 0.35, 0.55, 0.45, 0.20],
+            [0.05, 0.05, 0.10, 0.08, 0.08, 0.20, 0.10, 0.15, 0.25],
+            [0.02, 0.02, 0.05, 0.05, 0.05, 0.15, 0.15, 0.20, 0.30],
+            [0.15, 0.25, 0.45, 0.05, 0.05, 0.15, 0.02, 0.02, 0.05],
+            [0.08, 0.08, 0.10, 0.07, 0.05, 0.10, 0.08, 0.08, 0.10],
+            [0.05, 0.05, 0.05, 0.05, 0.02, 0.05, 0.10, 0.10, 0.10],
+        ],
+        "symptoms": {
+            "Healthy": {
+                "Wilting": [0.96, 0.03, 0.01], "WhiteSpots": [0.99, 0.01, 0.00], "YellowLeaves": [0.95, 0.04, 0.01],
+                "StuntedGrowth": [0.98, 0.01, 0.01], "BlackSpots": [0.99, 0.01, 0.00], "LeafCurl": [0.99, 0.01, 0.00],
+                "FoulSmell": [0.99, 0.01, 0.00]
+            },
+            "Leaf_Rust": {
+                "YellowLeaves": [0.10, 0.40, 0.50], "BlackSpots": [0.15, 0.45, 0.40]
+            },
+            "Stem_Rust": {
+                "StuntedGrowth": [0.20, 0.40, 0.40], "Wilting": [0.30, 0.40, 0.30], "BlackSpots": [0.10, 0.30, 0.60]
+            },
+            "Powdery_Mildew": {
+                "WhiteSpots": [0.05, 0.25, 0.70], "YellowLeaves": [0.30, 0.40, 0.30]
+            },
+            "Loose_Smut": {
+                "BlackSpots": [0.05, 0.15, 0.80], "StuntedGrowth": [0.30, 0.40, 0.30]
+            },
+            "Root_Rot": {
+                "Wilting": [0.10, 0.30, 0.60], "YellowLeaves": [0.20, 0.45, 0.35], "FoulSmell": [0.30, 0.40, 0.30]
+            }
+        }
     },
-    "Root_Rot": {
-        "emoji": "🔴",
-        "color": "#F44336",
-        "description": "Caused by overwatering or poor drainage, leading to decaying roots.",
-        "tip": "Reduce watering, improve drainage, remove affected roots, apply fungicide.",
+    "potato": {
+        "name": "Potato",
+        "emoji": "🥔",
+        "diseases": [
+            "Healthy",
+            "Late_Blight",
+            "Early_Blight",
+            "Black_Dot",
+            "Common_Scab",
+            "Black_Scurf",
+        ],
+        "disease_info": {
+            "Healthy": {
+                "emoji": "🟢",
+                "color": "#4CAF50",
+                "description": "Your potato foliage and roots appear healthy.",
+                "tip": "Maintain balanced moisture levels and watch out for beetles.",
+            },
+            "Late_Blight": {
+                "emoji": "🔴",
+                "color": "#F44336",
+                "description": "The notorious blight causing rotting spots, quick leaf decay, and white fuzzy spores in humid weather.",
+                "tip": "Remove infected foliage, use certified seed tubers, and spray copper-based fungicide.",
+            },
+            "Early_Blight": {
+                "emoji": "🟠",
+                "color": "#FF5722",
+                "description": "Fungus causing dry, dark brown lesions with target-pattern rings on mature leaves.",
+                "tip": "Apply mulch, avoid overhead watering, and fertilize adequately.",
+            },
+            "Black_Dot": {
+                "emoji": "🟡",
+                "color": "#FFC107",
+                "description": "Fungal infection yielding yellow wilted foliage and tiny black spots on stems and roots.",
+                "tip": "Ensure proper field drainage, destroy old stems, and rotate crops.",
+            },
+            "Common_Scab": {
+                "emoji": "🟤",
+                "color": "#8D6E63",
+                "description": "Bacterial pathogen causing corky, scabby lesions on tuber surfaces (represented by brown foliage spots).",
+                "tip": "Lower soil pH slightly, keep soil damp during tuber initiation, and rotate crops.",
+            },
+            "Black_Scurf": {
+                "emoji": "🟣",
+                "color": "#9C27B0",
+                "description": "Rhizoctonia infection causing dark brown scale on tubers, stunting, and upward leaf curling.",
+                "tip": "Plant seed in warm soils, avoid deep planting, and harvest early.",
+            },
+        },
+        "disease_cpd": [
+            [0.60, 0.50, 0.20, 0.70, 0.75, 0.30, 0.50, 0.40, 0.15],
+            [0.15, 0.25, 0.50, 0.05, 0.05, 0.25, 0.02, 0.02, 0.05],
+            [0.05, 0.05, 0.10, 0.05, 0.05, 0.15, 0.10, 0.15, 0.25],
+            [0.05, 0.05, 0.05, 0.08, 0.05, 0.10, 0.15, 0.15, 0.20],
+            [0.05, 0.05, 0.05, 0.08, 0.05, 0.05, 0.18, 0.18, 0.15],
+            [0.10, 0.10, 0.10, 0.04, 0.05, 0.15, 0.05, 0.10, 0.20],
+        ],
+        "symptoms": {
+            "Healthy": {
+                "Wilting": [0.95, 0.04, 0.01], "WhiteSpots": [0.98, 0.01, 0.01], "YellowLeaves": [0.95, 0.04, 0.01],
+                "StuntedGrowth": [0.97, 0.02, 0.01], "BlackSpots": [0.98, 0.01, 0.01], "LeafCurl": [0.96, 0.03, 0.01],
+                "FoulSmell": [0.99, 0.01, 0.00]
+            },
+            "Late_Blight": {
+                "BlackSpots": [0.10, 0.30, 0.60], "Wilting": [0.40, 0.40, 0.20], "WhiteSpots": [0.15, 0.45, 0.40],
+                "FoulSmell": [0.35, 0.45, 0.20]
+            },
+            "Early_Blight": {
+                "BlackSpots": [0.05, 0.25, 0.70], "YellowLeaves": [0.15, 0.45, 0.40]
+            },
+            "Black_Dot": {
+                "YellowLeaves": [0.20, 0.40, 0.40], "Wilting": [0.25, 0.45, 0.30], "StuntedGrowth": [0.30, 0.40, 0.30],
+                "BlackSpots": [0.40, 0.40, 0.20]
+            },
+            "Common_Scab": {
+                "BlackSpots": [0.10, 0.30, 0.60]
+            },
+            "Black_Scurf": {
+                "StuntedGrowth": [0.20, 0.40, 0.40], "LeafCurl": [0.15, 0.45, 0.40], "BlackSpots": [0.30, 0.45, 0.25]
+            }
+        }
     },
-    "Leaf_Blight": {
-        "emoji": "🟠",
-        "color": "#FF5722",
-        "description": "Causes dark brown/black lesions on leaves, spreads in warm humid conditions.",
-        "tip": "Remove infected leaves, apply copper-based fungicide, space plants well.",
-    },
-    "Bacterial_Wilt": {
-        "emoji": "🟣",
-        "color": "#9C27B0",
-        "description": "A bacterial infection that blocks water transport, causing rapid wilting.",
-        "tip": "Remove infected plants, rotate crops, sterilise tools, avoid overwatering.",
-    },
-    "Downy_Mildew": {
-        "emoji": "🔵",
-        "color": "#2196F3",
-        "description": "A fungal-like pathogen causing white/grey patches on leaf undersides.",
-        "tip": "Improve ventilation, reduce humidity, apply systemic fungicide.",
-    },
-    "Mosaic_Virus": {
-        "emoji": "🌐",
-        "color": "#009688",
-        "description": "A viral infection causing mottled leaf patterns, curling, and stunted growth.",
-        "tip": "Remove infected plants, control aphid vectors, use virus-free seeds.",
-    },
+    "corn": {
+        "name": "Corn",
+        "emoji": "🌽",
+        "diseases": [
+            "Healthy",
+            "Common_Rust",
+            "Gray_Leaf_Spot",
+            "Northern_Leaf_Blight",
+            "Maize_Dwarf_Mosaic",
+            "Stalk_Rot",
+        ],
+        "disease_info": {
+            "Healthy": {
+                "emoji": "🟢",
+                "color": "#4CAF50",
+                "description": "Your maize plants appear strong, tall, and healthy.",
+                "tip": "Maintain regular watering and nitrogen schedules.",
+            },
+            "Common_Rust": {
+                "emoji": "🟠",
+                "color": "#FF5722",
+                "description": "Fungal rust creating small, powdery, cinnamon-brown pustules on leaves.",
+                "tip": "Plant resistant hybrids, spray foliar fungicides if severe, and destroy crop residues.",
+            },
+            "Gray_Leaf_Spot": {
+                "emoji": "🟡",
+                "color": "#FFC107",
+                "description": "Fungus producing long, rectangular, greyish-tan leaf lesions between veins.",
+                "tip": "Use tillage to bury old residues, rotate to non-host crops, and apply fungicide.",
+            },
+            "Northern_Leaf_Blight": {
+                "emoji": "🟤",
+                "color": "#A1887F",
+                "description": "Fungal pathogen yielding large, grey-green cigar-shaped necrotic lesions.",
+                "tip": "Select resistant hybrids, manage crop residue, and rotate crops.",
+            },
+            "Maize_Dwarf_Mosaic": {
+                "emoji": "🌐",
+                "color": "#009688",
+                "description": "Viral pathogen causing light-green mottled streaks, leaf curling, and severe stunting.",
+                "tip": "Control aphid vectors, eradicate wild Johnsongrass hosts, and sow resistant varieties.",
+            },
+            "Stalk_Rot": {
+                "emoji": "🔴",
+                "color": "#F44336",
+                "description": "Severe decay of internal stalk tissue causing wilting, foul smell, and lodging.",
+                "tip": "Avoid plant overcrowding, avoid overwatering, and optimize potassium nutrients.",
+            },
+        },
+        "disease_cpd": [
+            [0.60, 0.50, 0.20, 0.70, 0.75, 0.30, 0.50, 0.40, 0.15],
+            [0.15, 0.20, 0.40, 0.05, 0.05, 0.15, 0.02, 0.02, 0.05],
+            [0.05, 0.05, 0.10, 0.05, 0.05, 0.20, 0.10, 0.15, 0.25],
+            [0.10, 0.15, 0.20, 0.05, 0.05, 0.15, 0.05, 0.05, 0.10],
+            [0.08, 0.08, 0.08, 0.05, 0.05, 0.10, 0.18, 0.18, 0.15],
+            [0.02, 0.02, 0.02, 0.10, 0.05, 0.10, 0.15, 0.20, 0.30],
+        ],
+        "symptoms": {
+            "Healthy": {
+                "Wilting": [0.96, 0.03, 0.01], "WhiteSpots": [0.99, 0.01, 0.00], "YellowLeaves": [0.95, 0.04, 0.01],
+                "StuntedGrowth": [0.98, 0.01, 0.01], "BlackSpots": [0.99, 0.01, 0.00], "LeafCurl": [0.99, 0.01, 0.00],
+                "FoulSmell": [0.99, 0.01, 0.00]
+            },
+            "Common_Rust": {
+                "YellowLeaves": [0.20, 0.40, 0.40], "BlackSpots": [0.10, 0.30, 0.60]
+            },
+            "Gray_Leaf_Spot": {
+                "YellowLeaves": [0.15, 0.45, 0.40], "BlackSpots": [0.05, 0.25, 0.70]
+            },
+            "Northern_Leaf_Blight": {
+                "YellowLeaves": [0.20, 0.40, 0.40], "BlackSpots": [0.10, 0.40, 0.50]
+            },
+            "Maize_Dwarf_Mosaic": {
+                "StuntedGrowth": [0.05, 0.25, 0.70], "YellowLeaves": [0.10, 0.40, 0.50], "LeafCurl": [0.10, 0.40, 0.50]
+            },
+            "Stalk_Rot": {
+                "Wilting": [0.10, 0.35, 0.55], "FoulSmell": [0.15, 0.35, 0.50], "StuntedGrowth": [0.30, 0.40, 0.30]
+            }
+        }
+    }
 }
 
 
 # ==================================================================
-# Bayesian Network Model
+# Bayesian Network Engine & Model Builder
 # ==================================================================
 
-def build_model():
-    """
-    Construct and return the expanded Bayesian Network with all CPDs.
-    """
+def get_symptom_matrix(profiles: dict, diseases: list[str], symptom: str) -> list[list[float]]:
+    """Build a (3, len(diseases)) conditional probability matrix for a symptom."""
+    matrix = []
+    for state_idx in range(3):
+        row = []
+        for disease in diseases:
+            profile = profiles.get(disease, {})
+            if symptom in profile:
+                row.append(profile[symptom][state_idx])
+            else:
+                if disease == "Healthy":
+                    default_vals = [0.95, 0.04, 0.01]
+                else:
+                    default_vals = [0.85, 0.12, 0.03]
+                row.append(default_vals[state_idx])
+        matrix.append(row)
+    return matrix
+
+
+def build_crop_network(crop_key: str, data: dict) -> DiscreteBayesianNetwork:
+    """Build a pgmpy DiscreteBayesianNetwork for the selected crop."""
+    diseases = data["diseases"]
+    disease_cpd_vals = data["disease_cpd"]
+    profiles = data["symptoms"]
+
     edges = []
     for env in ENVIRON_NODES:
         edges.append((env, "CropDisease"))
@@ -113,7 +407,6 @@ def build_model():
 
     model = DiscreteBayesianNetwork(edges)
 
-    # --- Priors for environmental nodes ---
     cpd_temperature = TabularCPD(
         variable="Temperature", variable_card=3,
         values=[[0.25], [0.50], [0.25]],
@@ -125,160 +418,92 @@ def build_model():
         state_names={"Humidity": ENVIRON_STATES},
     )
 
-    # --- P(CropDisease | Temperature, Humidity) ---
     cpd_disease = TabularCPD(
-        variable="CropDisease", variable_card=7,
-        values=[
-            [0.55, 0.50, 0.30, 0.60, 0.65, 0.35, 0.45, 0.40, 0.20],
-            [0.05, 0.08, 0.05, 0.10, 0.08, 0.08, 0.15, 0.12, 0.08],
-            [0.05, 0.10, 0.25, 0.03, 0.05, 0.20, 0.03, 0.08, 0.18],
-            [0.05, 0.05, 0.10, 0.05, 0.05, 0.12, 0.10, 0.12, 0.22],
-            [0.05, 0.05, 0.03, 0.07, 0.05, 0.05, 0.12, 0.12, 0.10],
-            [0.20, 0.17, 0.22, 0.08, 0.05, 0.12, 0.05, 0.06, 0.10],
-            [0.05, 0.05, 0.05, 0.07, 0.07, 0.08, 0.10, 0.10, 0.12],
-        ],
+        variable="CropDisease", variable_card=len(diseases),
+        values=disease_cpd_vals,
         evidence=["Temperature", "Humidity"], evidence_card=[3, 3],
         state_names={
-            "CropDisease": DISEASE_STATES,
+            "CropDisease": diseases,
             "Temperature": ENVIRON_STATES,
             "Humidity": ENVIRON_STATES,
         },
     )
 
-    # --- Symptom CPDs ---
-    cpd_wilting = TabularCPD(
-        variable="Wilting", variable_card=3,
-        values=[
-            [0.90, 0.60, 0.10, 0.50, 0.05, 0.55, 0.60],
-            [0.08, 0.25, 0.20, 0.30, 0.15, 0.30, 0.25],
-            [0.02, 0.15, 0.70, 0.20, 0.80, 0.15, 0.15],
-        ],
-        evidence=["CropDisease"], evidence_card=[7],
-        state_names={"Wilting": SYMPTOM_STATES, "CropDisease": DISEASE_STATES},
-    )
+    cpds = [cpd_temperature, cpd_humidity, cpd_disease]
 
-    cpd_white_spots = TabularCPD(
-        variable="WhiteSpots", variable_card=3,
-        values=[
-            [0.95, 0.05, 0.90, 0.85, 0.90, 0.20, 0.85],
-            [0.04, 0.20, 0.08, 0.10, 0.08, 0.40, 0.10],
-            [0.01, 0.75, 0.02, 0.05, 0.02, 0.40, 0.05],
-        ],
-        evidence=["CropDisease"], evidence_card=[7],
-        state_names={"WhiteSpots": SYMPTOM_STATES, "CropDisease": DISEASE_STATES},
-    )
+    for symptom in SYMPTOM_NODES:
+        matrix = get_symptom_matrix(profiles, diseases, symptom)
+        cpd_symptom = TabularCPD(
+            variable=symptom, variable_card=3,
+            values=matrix,
+            evidence=["CropDisease"], evidence_card=[len(diseases)],
+            state_names={symptom: SYMPTOM_STATES, "CropDisease": diseases},
+        )
+        cpds.append(cpd_symptom)
 
-    cpd_yellow_leaves = TabularCPD(
-        variable="YellowLeaves", variable_card=3,
-        values=[
-            [0.90, 0.50, 0.15, 0.20, 0.40, 0.25, 0.40],
-            [0.08, 0.30, 0.25, 0.35, 0.35, 0.40, 0.35],
-            [0.02, 0.20, 0.60, 0.45, 0.25, 0.35, 0.25],
-        ],
-        evidence=["CropDisease"], evidence_card=[7],
-        state_names={"YellowLeaves": SYMPTOM_STATES, "CropDisease": DISEASE_STATES},
-    )
-
-    cpd_stunted_growth = TabularCPD(
-        variable="StuntedGrowth", variable_card=3,
-        values=[
-            [0.92, 0.65, 0.30, 0.55, 0.25, 0.60, 0.20],
-            [0.06, 0.25, 0.35, 0.30, 0.30, 0.25, 0.35],
-            [0.02, 0.10, 0.35, 0.15, 0.45, 0.15, 0.45],
-        ],
-        evidence=["CropDisease"], evidence_card=[7],
-        state_names={"StuntedGrowth": SYMPTOM_STATES, "CropDisease": DISEASE_STATES},
-    )
-
-    cpd_black_spots = TabularCPD(
-        variable="BlackSpots", variable_card=3,
-        values=[
-            [0.95, 0.70, 0.75, 0.10, 0.60, 0.55, 0.70],
-            [0.04, 0.20, 0.18, 0.30, 0.25, 0.30, 0.20],
-            [0.01, 0.10, 0.07, 0.60, 0.15, 0.15, 0.10],
-        ],
-        evidence=["CropDisease"], evidence_card=[7],
-        state_names={"BlackSpots": SYMPTOM_STATES, "CropDisease": DISEASE_STATES},
-    )
-
-    cpd_leaf_curl = TabularCPD(
-        variable="LeafCurl", variable_card=3,
-        values=[
-            [0.93, 0.55, 0.65, 0.50, 0.50, 0.45, 0.10],
-            [0.05, 0.30, 0.25, 0.30, 0.30, 0.35, 0.30],
-            [0.02, 0.15, 0.10, 0.20, 0.20, 0.20, 0.60],
-        ],
-        evidence=["CropDisease"], evidence_card=[7],
-        state_names={"LeafCurl": SYMPTOM_STATES, "CropDisease": DISEASE_STATES},
-    )
-
-    cpd_foul_smell = TabularCPD(
-        variable="FoulSmell", variable_card=3,
-        values=[
-            [0.95, 0.85, 0.15, 0.60, 0.50, 0.80, 0.90],
-            [0.04, 0.10, 0.25, 0.25, 0.30, 0.15, 0.08],
-            [0.01, 0.05, 0.60, 0.15, 0.20, 0.05, 0.02],
-        ],
-        evidence=["CropDisease"], evidence_card=[7],
-        state_names={"FoulSmell": SYMPTOM_STATES, "CropDisease": DISEASE_STATES},
-    )
-
-    model.add_cpds(
-        cpd_temperature, cpd_humidity, cpd_disease,
-        cpd_wilting, cpd_white_spots, cpd_yellow_leaves,
-        cpd_stunted_growth, cpd_black_spots, cpd_leaf_curl, cpd_foul_smell,
-    )
-
-    assert model.check_model(), "Model validation failed!"
+    model.add_cpds(*cpds)
+    assert model.check_model(), f"Model check failed for crop {crop_key}"
     return model
 
 
-# Build model once at import time
-_MODEL = build_model()
-_INFERENCE = VariableElimination(_MODEL)
+# Pre-build models and variable elimination inferences for all crops
+MODELS = {}
+INFERENCES = {}
+
+print("🌿 Pre-building Bayesian Networks for all crops...")
+for crop_k, crop_d in CROP_DEFS.items():
+    net = build_crop_network(crop_k, crop_d)
+    MODELS[crop_k] = net
+    INFERENCES[crop_k] = VariableElimination(net)
+print("✅ Crop models loaded successfully.")
 
 
-def predict_disease(symptoms: dict, environment: dict | None = None) -> dict:
-    """Predict crop disease probabilities given symptoms and environment."""
+def predict_disease(crop: str, symptoms: dict, environment: dict) -> dict:
+    """Run Variable Elimination inference on the specific crop network."""
+    if crop not in INFERENCES:
+        raise ValueError(f"Unknown crop: {crop}")
+
+    inference = INFERENCES[crop]
+    diseases = CROP_DEFS[crop]["diseases"]
     evidence = {}
 
     if symptoms:
         for k, v in symptoms.items():
-            if v is not None and v != "None":
+            if v is not None and v != "None" and k in SYMPTOM_NODES:
                 evidence[k] = v
 
     if environment:
         for k, v in environment.items():
-            if v is not None:
+            if v is not None and k in ENVIRON_NODES:
                 evidence[k] = v
 
     if not evidence:
-        query_result = _INFERENCE.query(variables=["CropDisease"])
+        query_result = inference.query(variables=["CropDisease"])
         probs = query_result.values
         return {
             state: round(float(p), 4)
-            for state, p in zip(DISEASE_STATES, probs)
+            for state, p in zip(diseases, probs)
         }
 
-    query_result = _INFERENCE.query(
+    query_result = inference.query(
         variables=["CropDisease"],
         evidence=evidence,
     )
     probabilities = query_result.values
     return {
         state: round(float(prob), 4)
-        for state, prob in zip(DISEASE_STATES, probabilities)
+        for state, prob in zip(diseases, probabilities)
     }
 
 
 # ==================================================================
-# FastAPI Application
+# FastAPI Web Server Setup
 # ==================================================================
 
 app = FastAPI(
     title="Agriculture Disease Finder API",
-    description="AI-powered crop disease diagnosis using Bayesian Networks",
-    version="2.0.0",
+    description="AI-powered crop-specific disease diagnosis using Bayesian Networks",
+    version="3.0.0",
 )
 
 # Enable CORS for React dev server
@@ -292,6 +517,7 @@ app.add_middleware(
 
 
 class PredictRequest(BaseModel):
+    crop: str = "tomato"
     symptoms: dict = {}
     environment: dict = {}
 
@@ -313,34 +539,58 @@ class PredictResponse(BaseModel):
 
 @app.get("/health")
 def health_check():
-    return {"status": "ok", "model": "Bayesian Network", "diseases": 7, "symptoms": 7}
+    return {
+        "status": "ok",
+        "model": "Discrete Bayesian Network (pgmpy)",
+        "crops": list(CROP_DEFS.keys()),
+        "symptoms_count": len(SYMPTOM_NODES),
+    }
 
 
 @app.get("/model-info")
 def model_info():
+    """Returns metadata for all crops, including diseases, emojis, descriptions, tips, and symptoms."""
+    crops_metadata = {}
+    for crop_k, crop_d in CROP_DEFS.items():
+        crops_metadata[crop_k] = {
+            "name": crop_d["name"],
+            "emoji": crop_d["emoji"],
+            "diseases": crop_d["diseases"],
+            "disease_info": crop_d["disease_info"],
+        }
+
     return {
-        "diseases": DISEASE_STATES,
+        "crops": list(CROP_DEFS.keys()),
+        "crop_details": crops_metadata,
         "symptoms": SYMPTOM_NODES,
         "symptom_states": SYMPTOM_STATES,
         "environment_nodes": ENVIRON_NODES,
         "environment_states": ENVIRON_STATES,
-        "disease_info": DISEASE_INFO,
     }
 
 
 @app.post("/predict", response_model=PredictResponse)
 def predict(request: PredictRequest):
-    results = predict_disease(request.symptoms, request.environment)
+    crop_k = request.crop.lower()
+    if crop_k not in CROP_DEFS:
+        raise HTTPException(status_code=400, detail=f"Crop '{request.crop}' is not supported. Choose from: {list(CROP_DEFS.keys())}")
 
-    # Sort by probability (descending)
+    try:
+        results = predict_disease(crop_k, request.symptoms, request.environment)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Inference Engine error: {str(e)}")
+
+    # Sort results by probability (descending)
     sorted_results = sorted(results.items(), key=lambda x: x[1], reverse=True)
 
     top_disease = sorted_results[0][0]
     top_probability = sorted_results[0][1]
 
+    disease_info_map = CROP_DEFS[crop_k]["disease_info"]
+
     predictions = []
     for disease, prob in sorted_results:
-        info = DISEASE_INFO.get(disease, {})
+        info = disease_info_map.get(disease, {})
         predictions.append(PredictionResult(
             disease=disease,
             probability=prob,
@@ -358,10 +608,10 @@ def predict(request: PredictRequest):
 
 
 # ------------------------------------------------------------------
-# Run directly with: python backend.py
+# Entry Point
 # ------------------------------------------------------------------
 if __name__ == "__main__":
     import uvicorn
-    print("🌿 Starting Agriculture Disease Finder API...")
+    print("🌿 Starting Crop-Specific Agriculture Disease Finder API...")
     print("📡 API docs at: http://localhost:8000/docs")
     uvicorn.run(app, host="0.0.0.0", port=8000)
